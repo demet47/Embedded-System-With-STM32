@@ -18,49 +18,129 @@
 
 #include <stdint.h>
 
+typedef struct {
+	volatile uint32_t MODER;
+	volatile uint32_t OTYPER;
+	volatile uint32_t OSPEEDR;
+	volatile uint32_t PUPDR;
+	volatile uint32_t IDR;
+	volatile uint32_t ODR;
+	volatile uint32_t BSRR;
+	volatile uint32_t LCKR;
+	volatile uint32_t AFR[2];
+	volatile uint32_t BRR;
+	uint32_t RESERVED;
+	volatile uint32_t SECCFGR;
+} GPIO_TypeDef;
+
+//PC0
+
+
+#define GPIOC ((GPIO_TypeDef *)	0x42020800)
+#define RCC_AHB2ENR *((volatile uint32_t *) (0x40021000 + 0x4C))
+#define RCC_CCIPR1 *((volatile uint32_t *) (0x40021000 + 0x088))
+#define ADC_SQR1 *((volatile uint32_t *) (0x42028000 +  0x30))
+#define ADC_CR1 *((volatile uint32_t *) (0x42028000 +  0x08))
+#define ADC_CFGR1 *((volatile uint32_t *) (0x42028000 +  0x0C))
+#define ADC_ISR1 *((volatile uint32_t *) (0x42028000 +  0x00))
+#define ADC_IER1 *((volatile uint32_t *) (0x42028000 +  0x04))
+#define ADC_DR1 *((volatile uint32_t *) (0x42028000 +  0x40))
+
+#define BLUE_LED ((GPIO_TypeDef *) 0x42020400) //blue led
+#define GREEN_LED ((GPIO_TypeDef *) 0x42020800) //green led
+#define RED_LED ((GPIO_TypeDef *) 0x42020000) //red led
+
+
+#define ISER1 ((uint32_t *) 0xE000E104)
+#define ISER2 ((uint32_t *) 0xE000E108)
+#define ISER3 ((uint32_t *) 0xE000E10C)
+#define ISER4 ((uint32_t *) 0xE000E110)
+
+
 void ADC1_2_IRQHandler() {
+	//max 4032 min 0
+	if(ADC_DR1 > 3024){
+		RED_LED->ODR |= 1 << 9;
+		BLUE_LED->ODR |= 1 << 7;
+		GREEN_LED->ODR |= 1 << 7;
+	}else if((3024 >= ADC_DR1) && (ADC_DR1 > 2016)){
+		BLUE_LED->ODR |= 1 << 7;
+		GREEN_LED->ODR |= 1 << 7;
+		RED_LED->ODR &= ~(1 << 9);
+	}else if((2016 >= ADC_DR1) && (ADC_DR1 > 1008)){
+		BLUE_LED->ODR |= 1 << 7;
+		RED_LED->ODR &= ~(1 << 9);
+		GREEN_LED->ODR &= ~(1 << 7);
+	}else{
+		RED_LED->ODR &= ~(1 << 9);
+		GREEN_LED->ODR &= ~(1 << 7);
+		BLUE_LED->ODR &= ~(1 << 7);
+	}
+	ADC_CR1 |= 4;
 }
 
 
+
+
 int main(void) {
+	//LEDS
+	RCC_AHB2ENR |= 1; //PA9 red PB7 blue PC7 green
+	RCC_AHB2ENR |= 2;
+	RCC_AHB2ENR |= 4;
+
+	BLUE_LED->MODER &= ~(0x02 << (7 * 2)); //output to port 7
+	GREEN_LED->MODER &= ~(0x02 << (7 * 2)); //output to port 5
+	RED_LED->MODER &= ~(0x02 << (9 * 2)); //output to port 9
+
 	//Enable Clock for GPIO
-	
+	RCC_AHB2ENR |= 1 << 2; //enable clock for GPIOC
+
 	//Enable Clock for ADC
-	
+	RCC_AHB2ENR |= 1 << 13;
+
 	//Select ADC clock as System clock
-	
+	RCC_CCIPR1 |= 0x03 << 28;
 
 	//Change Pin Mode to Analog
-	
+	GPIOC->MODER |= 0x03;
 
 	//Change Pin Pull/Down to no pull-up no pull-down
+	GPIOC->PUPDR &= ~(0x03); //blue reset
 
 	//Change Regular channel sequence length to 1 conversion
-
+	ADC_SQR1 &= ~(0x0F); //0 to 3rd bits are to be set to 0
 
 	//Add to channel to first sequence
-	
+	ADC_SQR1 |= 0x01 << 6;
 
 	//Disable Deep-power-down for ADC
-	
+	ADC_CR1 &= ~(0x1 << 29); //not sure
 
-	//Enable ADC Voltage regulator
-	
+	//Enable ADC Voltage regulator (ADVREGEN)
+	ADC_CR1 |= 0x01 << 28;
 
-	//Configure for Single conversion mode
-	
+	//Configure for Single conversion mode (CONT = 0)
+	ADC_CFGR1 &= ~(0x01 << 13);
 
 	//Enable ADC
-	
+	ADC_CR1 |= 1;
 
 	//Wait ADC is enabled
-	
+	while(!(ADC_ISR1 & 1));
 
-	//Enable interrupt for end of regular conversion
-	
+	//Enable interrupt for end of regular conversion (bit2 1)
+	ADC_IER1 |= 4;
 
+	//Start regular conversion of ADC (bit 2 set to 1)
+	ADC_CR1 |= 4;
 
-	//Start regular conversion of ADC
+	//interrupt enable
+	//ISER register 1 bit 5
+	*ISER1 |= 1 << 5;
+	__asm volatile(
+				"mov r0, #0 \n\t"
+				"msr primask, r0 \n\t"
+			 );
 
 	//Write program according to problem description
 	while(1){
