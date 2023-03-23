@@ -17,33 +17,281 @@
  */
 
 #include <stdint.h>
+#include <stdlib.h>
+
+typedef struct
+{
+	  volatile uint32_t CR1;
+	  volatile uint32_t CR2;
+	  volatile uint32_t SMCR;
+	  volatile uint32_t DIER;
+	  volatile uint32_t SR;
+	  volatile uint32_t EGR;
+	  volatile uint32_t CCMR1;
+	  volatile uint32_t CCMR2;
+	  volatile uint32_t CCER;
+	  volatile uint32_t CNT;
+	  volatile uint32_t PSC;
+	  volatile uint32_t ARR;
+	  volatile uint32_t RCR;
+	  volatile uint32_t CCR1;
+	  volatile uint32_t CCR2;
+	  volatile uint32_t CCR3;
+	  volatile uint32_t CCR4;
+	  volatile uint32_t BDTR;
+	  volatile uint32_t DCR;
+	  volatile uint32_t DMAR;
+	  volatile uint32_t OR1;
+	  volatile uint32_t CCMR3;
+	  volatile uint32_t CCR5;
+	  volatile uint32_t CCR6;
+	  volatile uint32_t OR2;
+	  volatile uint32_t OR3;
+} TIM_TypeDef;
+
+
+typedef struct {
+	volatile uint32_t MODER;
+	volatile uint32_t OTYPER;
+	volatile uint32_t OSPEEDR;
+	volatile uint32_t PUPDR;
+	volatile uint32_t IDR;
+	volatile uint32_t ODR;
+	volatile uint32_t BSRR;
+	volatile uint32_t LCKR;
+	volatile uint32_t AFRL;
+	volatile uint32_t AFRH;
+	volatile uint32_t BRR;
+	uint32_t RESERVED;
+	volatile uint32_t SECCFGR;
+} GPIO_TypeDef;
+
+typedef struct {
+	volatile uint32_t CR1;
+	volatile uint32_t CR2;
+	volatile uint32_t CR3;
+	volatile uint32_t BRR;
+	volatile uint32_t reserved1;
+	volatile uint32_t reserved2;
+	volatile uint32_t RQR;
+	volatile uint32_t ISR;
+	volatile uint32_t ICR;
+	volatile uint32_t RDR;
+	volatile uint32_t TDR;
+	volatile uint32_t PRESC;
+} LPUART_TypeDef;
+
+typedef struct {
+	volatile uint32_t CR1;
+	volatile uint32_t CR2;
+	volatile uint32_t CR3;
+	volatile uint32_t BRR;
+	volatile uint32_t GTPR;
+	volatile uint32_t RTOR;
+	volatile uint32_t RQR;
+	volatile uint32_t ISR;
+	volatile uint32_t ICR;
+	volatile uint32_t RDR;
+	volatile uint32_t TDR;
+	volatile uint32_t PRESC;
+} USART_TypeDef;
+
+#define GPIOC ((GPIO_TypeDef *)	0x42020800)
+#define GPIOG ((GPIO_TypeDef *)	 0x42021800)
+#define GPIOD ((GPIO_TypeDef *)	 0x42020C00)
+
+#define RCC_APB1ENR1 *((volatile uint32_t *) (0x40021000 + 0x058))
+#define RCC_APB1ENR2 *((volatile uint32_t *) (0x40021000 + 0x05C))
+#define RCC_AHB2ENR *((volatile uint32_t *) (0x40021000 + 0x04C))
+#define RCC_CFGR *((volatile uint32_t *) (0x40021000 + 0x008))
+#define PWR_CR1 *((volatile uint32_t *) (0x40007000  + 0x00))
+#define PWR_CR2 *((volatile uint32_t *) (0x40007000  + 0x04))
+#define LPUART1 ((LPUART_TypeDef *) 0x40008000)
+#define USART3 ((USART_TypeDef *) 0x40004800)
+
+#define RCC_CCIPR1 *((volatile uint32_t *) (0x40021000 + 0x088))
+#define ADC_SQR1 *((volatile uint32_t *) (0x42028000 +  0x30))
+#define ADC_CR1 *((volatile uint32_t *) (0x42028000 +  0x08))
+#define ADC_CFGR1 *((volatile uint32_t *) (0x42028000 +  0x0C))
+#define ADC_ISR1 *((volatile uint32_t *) (0x42028000 +  0x00))
+#define ADC_IER1 *((volatile uint32_t *) (0x42028000 +  0x04))
+#define ADC_DR1 *((volatile uint32_t *) (0x42028000 +  0x40))
+#define BLUE_LED ((GPIO_TypeDef *) 0x42020400) //blue led
+#define GREEN_LED ((GPIO_TypeDef *) 0x42020800) //green led
+#define RED_LED ((GPIO_TypeDef *) 0x42020000) //red led
+
+
+#define ISER1 ((uint32_t *) 0xE000E104)
+#define ISER2 ((uint32_t *) 0xE000E108)
+#define ISER3 ((uint32_t *) 0xE000E10C)
+#define ISER4 ((uint32_t *) 0xE000E110)
+#define TIM4 ((TIM_TypeDef *)	0x40000800)
+
+#define IPR16mod2 ((uint32_t *) 0xE000E400 + 0x200 + 16)
+
+
+
 
 void LPUART1_IRQHandler() {
+
 }
+
+void ADC1_2_IRQHandler() {
+	ADC_DR1;
+	ADC_CR1 |= 4;
+}
+
+
+void TIM4_IRQHandler(void){
+	//write ADC_DR1 to necessary buffer and trigger LPUART interrupt
+	int adcdr = ADC_DR1;
+	int f = 1000;
+	for(int i = 3; i >= 0; i--){
+		send((adcdr / f + 48));
+		adcdr %= f; //4321
+		f /= 10;
+	}
+	send('\r');
+	send('\n');
+	LPUART1->ICR |= 1 << 6;
+	TIM4->SR = 0;
+}
+
+void send(uint8_t msg){
+	LPUART1->TDR = msg;
+	//LPUART1->ICR |= 1 << 6; //transmission complete
+	//LPUART1->ISR = 1 << 6;
+}
+
+
+void init_timer(){
+
+}
+
+
+
+//426 memory map for rcc
+
+//USART.TX PD8, USART.RX PD9, LPUART.TX PG7, LPUART.RX PG8
 
 int main(void) {
+	//!!!!!!!!!!!!!!!!!!!!!!!!!!!!prelab9!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+		//Enable Clock for GPIO
+		RCC_AHB2ENR |= 1 << 2; //enable clock for GPIOC
+
+		//Enable Clock for ADC
+		RCC_AHB2ENR |= 1 << 13;
+
+		//Select ADC clock as System clock
+		RCC_CCIPR1 |= 0x03 << 28;
+
+		//Change Pin Mode to Analog
+		GPIOC->MODER |= 0x03;
+
+		//Change Regular channel sequence length to 1 conversion
+		ADC_SQR1 &= ~(0x0F); //0 to 3rd bits are to be set to 0
+
+		//Add to channel to first sequence
+		ADC_SQR1 |= 0x01 << 6;
+
+		//Disable Deep-power-down for ADC
+		ADC_CR1 &= ~(0x1 << 29); //not sure
+
+		//Enable ADC Voltage regulator (ADVREGEN)
+		ADC_CR1 |= 0x01 << 28;
+
+		//Configure for Single conversion mode (CONT = 0)
+		ADC_CFGR1 &= ~(0x01 << 13);
+
+		//Enable ADC
+		ADC_CR1 |= 1;
+
+		//Wait ADC is enabled
+		while(!(ADC_ISR1 & 1));
+
+		//Enable interrupt for end of regular conversion (bit2 1)
+		ADC_IER1 |= 4;
+
+		//Start regular conversion of ADC (bit 2 set to 1)
+		ADC_CR1 |= 4;
+
+		//interrupt enable
+		//ISER register 1 bit 5
+		*ISER1 |= 1 << 5;
+
+
+	//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!prelab10!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	RCC_APB1ENR1 |= 1 << 2;//enable clock for TIM4
+
 	//Enable Clock for Power Interface
+	RCC_APB1ENR1 |= 1 << 28;
 
 	//Change the regulator mode to Low-power mode
+	PWR_CR1 |= 1 << 14; //force the regulator in low-power mode
 
 	//Make VDDIO2 valid
+	PWR_CR2 |= 1 << 9;
 
 	//Change the clock source of Low-power UART to SYSCLK
+	RCC_CCIPR1 &= ~(0x3 << 10);
+	RCC_CCIPR1 |= 1 << 10;
 
 	//Enable Clock for Low-power UART
+	RCC_APB1ENR2 |= 1;
 
 	//Enable Clock for GPIO
+	RCC_AHB2ENR |= 1 << 6;
+	RCC_AHB2ENR |= 1 << 3;
 
 	//Change the functionality of the pin
+	GPIOG->MODER &=  ~(3 << 14); //alternate function mode
+	GPIOG->MODER |= 2 << 14;
+	GPIOG->AFRL &= ~(15 << 28); //AF8
+	GPIOG->AFRL |= 8 << 28;
 
 	//Change LPUART baud rate (BRR) for 9600 Baud rate
+	LPUART1->BRR = 106667; //may be problematic
 
 	//Enable FIFO mode for UART
+	LPUART1->CR1 |= 1 << 29;
 
 	//Enable Transmitter and Receiver for UART
-	
-	//Enable Interrupt and LPUART
+	LPUART1->CR1 |= 1 << 3; //USART transmission enabled
+	LPUART1->CR1 |= 1 << 2; //USART reception enabled
 
+	//Enable Interrupt and LPUART
+	//LPUART1->CR1 |= 1 << 5; //Receive register not empty interrupt
+	LPUART1->CR1 |= 1 << 6;// Transmit register empty interrupt
+	//*IPR16mod2 &= ~(15); //Set the highest urgency by setting the priority to 0
+	*ISER2 |= 1 << 1;//Enable NVIC interrupt for LPUART
+	//didn't arrange data bit, stop bit, parity bit. They are all set as intended by reset state
+
+
+	TIM4->ARR = 500;
+	TIM4->PSC = 4000 - 1;
+	TIM4->CR1 &= ~(1<<1);
+	TIM4->DIER |= 1;
+	TIM4->EGR |= 1;
+	TIM4->CNT = 0;
+	TIM4->SR = 0;
+	TIM4->CR1 |= 1;
+	*ISER1 |= (1 << 15);
+
+
+	//while ((LPUART1->ISR & 4194304) == 0);
+	__asm volatile(
+					"mov r0, #0 \n\t"
+					"msr primask, r0 \n\t"
+				 );
+
+	LPUART1->CR1 |= 1;
 	while(1){
+		__asm volatile("wfi");
 	}
+
 }
+
+//page 543 in textbook
+//page 1646 in manual for LPUART
